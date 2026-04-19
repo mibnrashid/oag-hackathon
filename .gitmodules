@@ -1,0 +1,3 @@
+[submodule "starlink-viz"]
+	path = starlink-viz
+	url = https://github.com/juliensimon/starlink-viz
