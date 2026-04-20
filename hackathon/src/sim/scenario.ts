@@ -30,49 +30,49 @@ export const TOUR_NARRATION: readonly NarrationCue[] = [
     tRel: 4,
     title: 'Phase 2 · Link degradation',
     caption:
-      'Comms between Sat-1 ↔ Sat-2 start dropping packets. Baseline trusts stale telemetry; AI drops its confidence estimate.',
+      'Comms between Sat-1 ↔ Sat-2 start dropping packets. Baseline trusts stale telemetry; Advanced autonomy drops its confidence estimate.',
     tone: 'warning',
   },
   {
     tRel: 14,
-    title: 'Phase 3 · Link lost · AI estimator engages',
+    title: 'Phase 3 · Link lost · Autonomous estimator engages',
     caption:
-      'Sat-1 ↔ Sat-2 is fully down. AI switches on dead-reckoning fusion to predict Sat-2 state from neighbours.',
+      'Sat-1 ↔ Sat-2 is fully down. Autonomy switches on dead-reckoning fusion to predict Sat-2 state from neighbours.',
     tone: 'ai',
   },
   {
     tRel: 16,
     title: 'Phase 4 · External disturbance',
     caption:
-      'Formation is perturbed. Baseline cannot correct against a neighbour it cannot observe; AI uses its prediction to keep tasks satisfied.',
+      'Formation is perturbed. Baseline cannot correct against a neighbour it cannot observe; Autonomy uses its prediction to keep tasks satisfied.',
     tone: 'warning',
   },
   {
     tRel: 22,
     title: 'Phase 5 · Telemetry delay storm',
     caption:
-      'Packet cadence slows 2.2×. Baseline uncertainty spikes; AI widens its estimator window instead of chasing stale data.',
+      'Packet cadence slows 2.2×. Baseline uncertainty spikes; Autonomy widens its estimator window instead of chasing stale data.',
     tone: 'warning',
   },
   {
     tRel: 34,
     title: 'Phase 6 · Coordinator role failure',
     caption:
-      'Sat-1 is degraded as coordinator. AI re-elects a healthier neighbour (highest link score) and redistributes tasks. Baseline keeps asking Sat-1.',
+      'Sat-1 is degraded as coordinator. Autonomy re-elects a healthier neighbour (highest link score) and redistributes tasks. Baseline keeps asking Sat-1.',
     tone: 'ai',
   },
   {
     tRel: 48,
     title: 'Phase 7 · Links restored',
     caption:
-      'Links come back. AI hands coordination back to Sat-1 and scales the estimator down. Baseline still has a stale uncertainty tail.',
+      'Links come back. Autonomy hands coordination back to Sat-1 and scales the estimator down. Baseline still has a stale uncertainty tail.',
     tone: 'recovery',
   },
   {
     tRel: 62,
     title: 'Phase 8 · Recovery complete',
     caption:
-      'Both systems back to nominal. Compare cumulative "degraded comms time": AI kept the swarm effective for longer.',
+      'Both systems back to nominal. Compare cumulative "degraded comms time": Autonomy kept the swarm effective for longer.',
     tone: 'recovery',
   },
 ];

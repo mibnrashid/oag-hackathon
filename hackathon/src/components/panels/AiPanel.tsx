@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import type { AiPanelSnapshot } from '@/sim/types';
+import { useMissionStore } from '@/store/mission-store';
+import { getCueForRel } from '@/sim/scenario';
 
 function RiskPill({ risk }: { risk: AiPanelSnapshot['risk'] }) {
   const cls =
@@ -16,14 +19,21 @@ function RiskPill({ risk }: { risk: AiPanelSnapshot['risk'] }) {
 
 export default function AiPanel({ panel }: { panel: AiPanelSnapshot }) {
   const confPct = Math.round(Math.max(0, Math.min(1, panel.minConfidence)) * 100);
+  
+  const tourActive = useMissionStore((s) => s.tourActive);
+  const tourStart = useMissionStore((s) => s.tourStartSimTime);
+  const simTime = useMissionStore((s) => s.world.simTime);
+  const rel = tourActive && tourStart >= 0 ? Math.max(0, simTime - tourStart) : -1;
+  const current = useMemo(() => getCueForRel(rel), [rel]);
+
   return (
     <div className="hud-panel p-3.5 flex flex-col gap-2.5 h-full overflow-hidden">
       <div>
         <div className="font-[family-name:var(--font-display)] text-[11px] tracking-[0.24em] text-cyan-200/90 mb-1">
-          AI DECISION SUPPORT
+          {tourActive && current ? current.cue.title.toUpperCase() : 'AUTONOMOUS DECISION SUPPORT'}
         </div>
         <div className="text-[10px] text-white/50 leading-snug">
-          Transparent heuristics: fusion, risk gating, and reassignment suggestions (not a black-box model).
+          {tourActive && current ? current.cue.caption : 'Transparent heuristics: fusion, risk gating, and reassignment suggestions (not a black-box model).'}
         </div>
       </div>
 
@@ -42,7 +52,7 @@ export default function AiPanel({ panel }: { panel: AiPanelSnapshot }) {
         <div className="rounded border border-cyan-400/20 bg-gradient-to-br from-cyan-900/30 to-black/40 p-2.5 relative overflow-hidden backdrop-blur-sm">
           <div className="text-[9px] tracking-widest text-cyan-300/90 font-bold mb-2 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_8px_#38bdf8]"></span>
-            AI DEAD-RECKONING ENGINE
+            AUTONOMOUS DEAD-RECKONING ENGINE
           </div>
           <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-[9px] leading-snug text-cyan-100/70">
             <span className="text-cyan-400/50 font-bold">IN:</span>

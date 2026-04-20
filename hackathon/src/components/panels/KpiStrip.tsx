@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import type { KpiSnapshot } from '@/sim/types';
 import { useMissionStore } from '@/store/mission-store';
+import { getCueForRel } from '@/sim/scenario';
 
 function Metric({
   label,
@@ -83,7 +84,7 @@ function ContinuitySpark() {
         viewBox={`0 0 ${viewportW} ${viewportH}`}
         preserveAspectRatio="none"
         className="w-full h-[42px]"
-        aria-label="Mission continuity — baseline vs AI"
+        aria-label="Mission continuity — baseline vs AUTONOMY"
       >
         <line x1={0} y1={viewportH * 0.15} x2={viewportW} y2={viewportH * 0.15} stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
         <line x1={0} y1={viewportH * 0.5} x2={viewportW} y2={viewportH * 0.5} stroke="rgba(255,255,255,0.06)" strokeDasharray="2 3" />
@@ -105,14 +106,22 @@ export default function KpiStrip({ baseline, ai }: { baseline: KpiSnapshot; ai: 
   const advantagePositive = contDelta > 0.5;
   const advantageNegative = contDelta < -0.5;
 
+  const tourActive = useMissionStore((s) => s.tourActive);
+  const tourStart = useMissionStore((s) => s.tourStartSimTime);
+  const simTime = useMissionStore((s) => s.world.simTime);
+  const rel = tourActive && tourStart >= 0 ? Math.max(0, simTime - tourStart) : -1;
+  const current = useMemo(() => getCueForRel(rel), [rel]);
+
   return (
     <div className="hud-panel p-3.5 h-full flex flex-col overflow-y-auto custom-scrollbar">
       <div className="flex items-start justify-between gap-3 mb-2 shrink-0">
         <div className="flex-1 min-w-0">
           <div className="font-[family-name:var(--font-display)] text-[11px] tracking-[0.24em] text-cyan-200/90 mb-1">
-            BASELINE vs AI · LIVE
+            {tourActive && current ? 'PHASE IMPACT \u00B7 SECONDS SAVED' : 'BASELINE vs AUTONOMY \u00B7 LIVE'}
           </div>
-          <div className="text-[10px] text-white/50 break-words whitespace-normal leading-tight">Same physics · different autonomy layer</div>
+          <div className="text-[10px] text-white/50 break-words whitespace-normal leading-tight">
+            {tourActive && current ? 'Measuring the autonomy layer\'s advantage in real-time' : 'Same physics \u00B7 different autonomy layer'}
+          </div>
         </div>
         <div
           className={`shrink-0 rounded px-2.5 py-1.5 border text-[10px] font-bold tracking-wide font-[family-name:var(--font-mono)] ${
@@ -123,7 +132,7 @@ export default function KpiStrip({ baseline, ai }: { baseline: KpiSnapshot; ai: 
                 : 'border-white/15 bg-white/5 text-white/70'
           }`}
         >
-          AI {contDelta >= 0 ? '+' : ''}
+          AUTONOMY {contDelta >= 0 ? '+' : ''}
           {contDelta.toFixed(0)} pts
         </div>
       </div>
@@ -133,7 +142,7 @@ export default function KpiStrip({ baseline, ai }: { baseline: KpiSnapshot; ai: 
           <span className="inline-block w-3 h-[2px] bg-rose-400" /> BASELINE
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-white/60 font-bold tracking-wider">
-          <span className="inline-block w-3 h-[2px] bg-cyan-400" /> AI
+          <span className="inline-block w-3 h-[2px] bg-cyan-400" /> AUTONOMY
         </div>
       </div>
       <div className="flex-1 w-full mb-4 min-h-[42px] shrink-0 lg:shrink">
