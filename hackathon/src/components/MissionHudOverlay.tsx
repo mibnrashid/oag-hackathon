@@ -83,41 +83,41 @@ export default function MissionHudOverlay() {
   }, [reset, startScriptedTour]);
 
   return (
-    <div className="fixed inset-0 pointer-events-none z-10 p-2 md:p-4">
-      <header className="absolute top-2 md:top-4 left-2 right-2 md:left-4 md:right-4 flex flex-wrap items-start justify-between gap-2 pointer-events-auto">
-        <div>
-          <div className="font-[family-name:var(--font-display)] text-[12px] md:text-[14px] tracking-[0.16em] text-[var(--color-accent)] hud-glow-text">
+    <div className="fixed inset-0 pointer-events-none z-10">
+      <header className="absolute top-3 md:top-4 left-3 right-3 md:left-4 md:right-4 flex flex-wrap items-start justify-between gap-2 pointer-events-none">
+        <div className="pointer-events-auto">
+          <div className="font-[family-name:var(--font-display)] text-[12px] md:text-[14px] tracking-[0.18em] text-[var(--color-accent)] hud-glow-text">
             SWARM MISSION CONTROL
           </div>
-          <div className="text-[10px] md:text-[11px] text-[var(--color-text-dim)] mt-0.5 max-w-[70vw] md:max-w-none">
+          <div className="text-[10px] md:text-[11px] text-[var(--color-text-dim)] mt-0.5">
             v2 · resilient coordination · {BACKGROUND_COUNT} background + 6 mission nodes
           </div>
         </div>
-        <LinkLegend />
+        <div className="pointer-events-auto">
+          <LinkLegend />
+        </div>
       </header>
 
-      {/* Mobile: stack scenario + AI so panels never overlap */}
-      <div className="lg:hidden absolute top-12 left-2 right-2 flex flex-col gap-2 max-h-[min(48vh,calc(100vh-220px))] overflow-y-auto pointer-events-auto z-[11]">
+      {/* Mobile stack */}
+      <div className="lg:hidden absolute top-14 left-3 right-3 flex flex-col gap-2 max-h-[calc(55vh-80px)] overflow-y-auto pointer-events-auto">
         <ScenarioPanel />
         <AiPanel panel={aiPanel} />
       </div>
 
-      {/* Desktop: starlink-style left / right columns */}
-      <div className="hidden lg:block absolute top-[4.25rem] left-4 w-[min(380px,calc(50vw-48px))] max-h-[min(58vh,calc(100vh-200px))] min-h-0 pointer-events-auto z-[11]">
+      {/* Desktop columns — bounded so they can never collide with the bottom strip */}
+      <div className="hidden lg:block absolute top-[4.25rem] bottom-[calc(220px+1rem)] left-4 w-[340px] pointer-events-auto">
         <ScenarioPanel />
       </div>
-      <div className="hidden lg:block absolute top-[4.25rem] right-4 w-[min(380px,calc(50vw-48px))] max-h-[min(58vh,calc(100vh-200px))] min-h-0 pointer-events-auto z-[11]">
+      <div className="hidden lg:block absolute top-[4.25rem] bottom-[calc(220px+1rem)] right-4 w-[340px] pointer-events-auto">
         <AiPanel panel={aiPanel} />
       </div>
 
-      <div
-        className="absolute bottom-2 md:bottom-4 left-2 right-2 md:left-4 md:right-4 flex flex-col md:flex-row gap-2 md:gap-3 pointer-events-auto max-h-[min(42vh,calc(100vh-120px))] md:max-h-[200px]"
-        style={{ zIndex: 11 }}
-      >
-        <div className="flex-1 min-h-0 min-w-0 md:max-w-[55%]">
+      {/* Bottom strip: event log + KPI split */}
+      <div className="absolute bottom-3 md:bottom-4 left-3 right-3 md:left-4 md:right-4 flex flex-col md:flex-row gap-2 md:gap-3 pointer-events-auto h-[200px]">
+        <div className="flex-1 min-h-0 min-w-0">
           <EventLogPanel logs={logs} />
         </div>
-        <div className="flex-shrink-0 w-full md:w-[min(420px,42%)] min-h-0">
+        <div className="shrink-0 w-full md:w-[380px] min-h-0">
           <KpiStrip baseline={baselineKpi} ai={aiKpi} />
         </div>
       </div>

@@ -1,6 +1,5 @@
-import { useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { Line, Text } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { MISSION_COUNT, MISSION_EDGES, edgeKey } from '@/sim/graph';
 import { missionPosition } from '@/sim/orbitLayout';
@@ -15,11 +14,6 @@ function linkColor(smoothed: number): string {
 export default function MissionGraph() {
   const angles = useMissionStore((s) => s.world.angles);
   const displayLink = useMissionStore((s) => s.displayLink);
-  const groupRef = useRef<THREE.Group>(null);
-
-  useFrame((_, dt) => {
-    if (groupRef.current) groupRef.current.rotation.y += dt * 0.06;
-  });
 
   const nodes = useMemo(() => {
     return Array.from({ length: MISSION_COUNT }, (_, i) => {
@@ -29,7 +23,7 @@ export default function MissionGraph() {
   }, [angles]);
 
   return (
-    <group ref={groupRef}>
+    <group>
       {MISSION_EDGES.map(([a, b]) => {
         const k = edgeKey(a, b);
         const sm = displayLink.get(k) ?? 0;

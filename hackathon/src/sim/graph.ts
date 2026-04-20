@@ -2,8 +2,9 @@ import type { LinkHealth } from './types';
 
 export const MISSION_COUNT = 6;
 export const BACKGROUND_COUNT = 700;
-export const ORBIT_RADIUS = 1.14;
-export const ANGULAR_RATE = 0.09;
+export const ORBIT_RADIUS = 1.17;
+/** rad/s — full mission orbit in ~2.5 min (demo-paced, not real LEO). */
+export const ANGULAR_RATE = 0.042;
 
 /** Undirected mission edges (visual + comms graph). */
 export const MISSION_EDGES: readonly [number, number][] = [

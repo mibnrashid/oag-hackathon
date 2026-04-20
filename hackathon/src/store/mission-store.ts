@@ -92,10 +92,20 @@ function seedObservations(
   initPacketSchedule(obs.nextPacketDue, world.simTime, edgeHealth, world.delayFactor, MISSION_EDGES);
 }
 
+function makeSeededInitial(): Pick<MissionState, 'world' | 'edgeHealth' | 'obs'> {
+  const world = createInitialWorld();
+  const edgeHealth = initialEdgeHealth();
+  const obs = createObservationState();
+  seedObservations(world, obs, edgeHealth);
+  return { world, edgeHealth, obs };
+}
+
+const __seeded = makeSeededInitial();
+
 export const useMissionStore = create<MissionState>((set, get) => ({
-  world: createInitialWorld(),
-  edgeHealth: initialEdgeHealth(),
-  obs: createObservationState(),
+  world: __seeded.world,
+  edgeHealth: __seeded.edgeHealth,
+  obs: __seeded.obs,
   pendingEvents: [],
   tourActive: false,
   baselineDegradedAccum: 0,
