@@ -19,23 +19,33 @@ function Metric({
   const delta = ai - base;
   const aiBetter = higherIsBetter ? delta > 0.5 : delta < -0.5;
   const aiWorse = higherIsBetter ? delta < -0.5 : delta > 0.5;
+  const deltaPct = base === 0 ? 0 : ((delta / base) * 100);
+  const deltaStr = Math.abs(deltaPct) > 0.5 ? `${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(0)}%` : '—';
+  
   return (
-    <div className="grid grid-cols-[1fr_56px_56px] gap-2 items-center border-b border-white/5 py-1.5 last:border-b-0">
-      <div className="text-[11px] tracking-wide text-[color:var(--color-mission-muted)] truncate">
+    <>
+      <div className="text-[12px] tracking-wide text-[color:var(--color-mission-muted)] truncate py-1.5 border-b border-white/5">
         {label}
-        {unit ? <span className="text-white/30 ml-1">{unit}</span> : null}
+        {unit ? <span className="text-white/30 ml-2">{unit}</span> : null}
       </div>
-      <div className="font-[family-name:var(--font-mono)] text-[13px] text-rose-200/90 text-right tabular-nums">
+      <div className="font-[family-name:var(--font-mono)] text-[14px] text-rose-200/90 text-right tabular-nums py-1.5 border-b border-white/5">
         {fmt(base)}
       </div>
       <div
-        className={`font-[family-name:var(--font-mono)] text-[13px] text-right tabular-nums ${
-          aiBetter ? 'text-emerald-200/95' : aiWorse ? 'text-rose-200/95' : 'text-cyan-200/95'
+        className={`font-[family-name:var(--font-mono)] text-[14px] text-right tabular-nums py-1.5 border-b border-white/5 ${
+          aiBetter ? 'text-emerald-300 font-bold' : aiWorse ? 'text-rose-300' : 'text-cyan-200/95'
         }`}
       >
         {fmt(ai)}
       </div>
-    </div>
+      <div
+        className={`font-[family-name:var(--font-mono)] text-[12px] text-right tabular-nums py-1.5 border-b border-white/5 ${
+          aiBetter ? 'text-emerald-400 font-bold font-[family-name:var(--font-display)]' : aiWorse ? 'text-rose-400' : 'text-white/30'
+        }`}
+      >
+        {deltaStr}
+      </div>
+    </>
   );
 }
 
@@ -96,16 +106,16 @@ export default function KpiStrip({ baseline, ai }: { baseline: KpiSnapshot; ai: 
   const advantageNegative = contDelta < -0.5;
 
   return (
-    <div className="hud-panel px-3 py-2.5 h-full min-h-0 flex flex-col">
-      <div className="flex items-start justify-between gap-3 mb-1.5">
-        <div className="min-w-0">
-          <div className="font-[family-name:var(--font-display)] text-[10.5px] tracking-[0.22em] text-cyan-200/80 truncate">
+    <div className="hud-panel p-3.5 h-full flex flex-col overflow-y-auto custom-scrollbar">
+      <div className="flex items-start justify-between gap-3 mb-2 shrink-0">
+        <div className="flex-1 min-w-0">
+          <div className="font-[family-name:var(--font-display)] text-[11px] tracking-[0.24em] text-cyan-200/90 mb-1">
             BASELINE vs AI · LIVE
           </div>
-          <div className="text-[9.5px] text-white/45 mt-0.5 truncate">Same physics · different autonomy layer</div>
+          <div className="text-[10px] text-white/50 break-words whitespace-normal leading-tight">Same physics · different autonomy layer</div>
         </div>
         <div
-          className={`shrink-0 rounded px-2 py-1 border text-[10px] tracking-wide font-[family-name:var(--font-mono)] ${
+          className={`shrink-0 rounded px-2.5 py-1.5 border text-[10px] font-bold tracking-wide font-[family-name:var(--font-mono)] ${
             advantagePositive
               ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100'
               : advantageNegative
@@ -118,39 +128,45 @@ export default function KpiStrip({ baseline, ai }: { baseline: KpiSnapshot; ai: 
         </div>
       </div>
 
-      <div className="flex items-center gap-2 mb-2">
-        <div className="flex items-center gap-1 text-[9px] text-white/55">
-          <span className="inline-block w-2 h-[2px] bg-rose-300/80" /> baseline
+      <div className="flex items-center gap-3 mb-2.5 shrink-0">
+        <div className="flex items-center gap-1.5 text-[10px] text-white/60 font-bold tracking-wider">
+          <span className="inline-block w-3 h-[2px] bg-rose-400" /> BASELINE
         </div>
-        <div className="flex items-center gap-1 text-[9px] text-white/55">
-          <span className="inline-block w-2 h-[2px] bg-cyan-300/90" /> AI
+        <div className="flex items-center gap-1.5 text-[10px] text-white/60 font-bold tracking-wider">
+          <span className="inline-block w-3 h-[2px] bg-cyan-400" /> AI
         </div>
+      </div>
+      <div className="flex-1 w-full mb-4 min-h-[42px] shrink-0 lg:shrink">
         <ContinuitySpark />
       </div>
 
-      <div className="flex-1 overflow-auto pr-1">
+      <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-3 gap-y-1 mb-3 shrink-0">
+        <div className="text-[10px] font-bold tracking-widest text-[color:var(--color-mission-muted)] border-b border-white/10 pb-1.5 mb-1 text-left">METRIC</div>
+        <div className="text-[10px] font-bold tracking-widest text-[#ff94a8] text-right border-b border-white/10 pb-1.5 mb-1">BASE</div>
+        <div className="text-[10px] font-bold tracking-widest text-[#7dd9ff] text-right border-b border-white/10 pb-1.5 mb-1">AI</div>
+        <div className="text-[10px] font-bold tracking-widest text-emerald-300 text-right border-b border-white/10 pb-1.5 mb-1">IMPACT</div>
+        
         <Metric label="Mission continuity" unit="%" base={baseline.missionContinuity} ai={ai.missionContinuity} />
         <Metric label="Tasks satisfied" unit="/3" base={baseline.tasksSatisfied} ai={ai.tasksSatisfied} />
         <Metric
-          label="Swarm uncertainty"
+          label="Formation error"
           base={baseline.swarmUncertainty}
           ai={ai.swarmUncertainty}
           higherIsBetter={false}
         />
-        <Metric
-          label="Degraded comms"
-          unit="s"
-          base={baseline.degradedCommsSec}
-          ai={ai.degradedCommsSec}
-          higherIsBetter={false}
-        />
       </div>
 
-      {degradedSaved > 1.5 ? (
-        <div className="mt-1.5 text-[10px] text-emerald-200/80 font-[family-name:var(--font-mono)]">
-          AI saved {degradedSaved.toFixed(0)}s of degraded coordination.
-        </div>
-      ) : null}
+      <div className="mt-1 text-[10px] text-white/50 leading-relaxed bg-black/20 p-2.5 rounded border border-white/5 shrink-0">
+        <strong className="text-emerald-300 tracking-wider font-bold mb-1 block">MEASURABLE PROOF</strong>
+        <span className="text-emerald-300 font-bold">{(baseline.swarmUncertainty - ai.swarmUncertainty > 0) ? `+${((baseline.swarmUncertainty - ai.swarmUncertainty) / Math.max(1, baseline.swarmUncertainty) * 100).toFixed(0)}%` : '0%'}</span> formation error reduction.<br />
+        <span className="text-emerald-300 font-bold">{(ai.tasksSatisfied - baseline.tasksSatisfied > 0) ? `+${((ai.tasksSatisfied - baseline.tasksSatisfied) / Math.max(1, baseline.tasksSatisfied) * 100).toFixed(0)}%` : '0%'}</span> task success increase.<br />
+        <div className="text-white/40 mt-1 text-[9px] border-t border-white/5 pt-1">Impact is calculated live against the deterministic baseline physics simulation.</div>
+        {degradedSaved > 1.5 && (
+          <div className="mt-1 text-emerald-300 font-[family-name:var(--font-mono)]">
+            AI saved {degradedSaved.toFixed(0)}s of degraded coordination.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

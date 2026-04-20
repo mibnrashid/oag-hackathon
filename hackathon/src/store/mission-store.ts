@@ -33,6 +33,7 @@ interface ContinuitySample {
 
 interface MissionState {
   world: WorldSnapshot;
+  demoMode: 'baseline' | 'ai';
   edgeHealth: Map<string, LinkHealth>;
   obs: ReturnType<typeof createObservationState>;
   pendingEvents: ScenarioEvent[];
@@ -62,6 +63,7 @@ interface MissionState {
   injectRoleFailure: () => void;
   restoreAllLinks: () => void;
   startScriptedTour: () => void;
+  setDemoMode: (m: 'baseline' | 'ai') => void;
 }
 
 function defaultKpi(): KpiSnapshot {
@@ -115,6 +117,7 @@ const __seeded = makeSeededInitial();
 
 export const useMissionStore = create<MissionState>((set, get) => ({
   world: __seeded.world,
+  demoMode: 'ai',
   edgeHealth: __seeded.edgeHealth,
   obs: __seeded.obs,
   pendingEvents: [],
@@ -138,6 +141,8 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   delayStorm: null,
   displayLink: new Map(),
   continuityHistory: [],
+
+  setDemoMode: (m) => set({ demoMode: m }),
 
   pushLog: (message, type) => {
     set((s) => ({
@@ -330,6 +335,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       s.aiDegradedAccum,
       dt,
       roleFailureActive,
+      s.aiPanel.coordinatorId,
     );
 
     if (ai.panel.estimatorActive && !s.aiPanel.estimatorActive && world.simTime > 0.08) {

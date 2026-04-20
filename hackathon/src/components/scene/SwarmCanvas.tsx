@@ -22,7 +22,7 @@ export default function SwarmCanvas() {
   return (
     <Canvas
       style={{ width: '100%', height: '100%', display: 'block' }}
-      camera={{ position: [0, 0.9, 3.0], fov: 42 }}
+      camera={{ position: [2.0, -0.8, 2.0], fov: 42 }}
       gl={{ antialias: true, powerPreference: 'high-performance' }}
       dpr={[1, 2]}
     >

@@ -40,19 +40,21 @@ export default function ScenarioPanel() {
   };
 
   return (
-    <div className="hud-panel p-3 flex flex-col gap-3 h-full min-h-0 max-h-full overflow-hidden">
+    <div className="hud-panel p-3.5 flex flex-col gap-3 h-full overflow-hidden">
       <div>
-        <div className="font-[family-name:var(--font-display)] text-[11px] tracking-[0.22em] text-cyan-200/80">
+        <div className="font-[family-name:var(--font-display)] text-[11px] tracking-[0.24em] text-cyan-200/90 mb-1">
           SCENARIO CONTROL
         </div>
-        <div className="text-[10px] text-white/45 mt-1 leading-relaxed">
+        <div className="text-[10px] text-white/50 leading-snug">
           Deterministic injects · baseline & AI see the same physics & comms truth.
         </div>
       </div>
 
-      <div className="text-[10px] text-white/35 font-[family-name:var(--font-mono)]">t = {world.simTime.toFixed(2)}s sim</div>
+      <div className="text-[10px] text-white/50 font-[family-name:var(--font-mono)] border-l-2 border-cyan-400/30 pl-2">
+        <span className="text-white/80 font-bold tracking-wider">t = {world.simTime.toFixed(2)}s</span> sim
+      </div>
 
-      <div className="flex-1 overflow-auto space-y-2 pr-1">
+      <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
         <Btn onClick={() => injectLinkLoss(0, 1)} tone="danger">
           Comms loss · Sat-1 ↔ Sat-2
         </Btn>

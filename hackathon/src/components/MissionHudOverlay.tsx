@@ -3,7 +3,6 @@ import { useMissionStore } from '@/store/mission-store';
 import ScenarioPanel from '@/components/panels/ScenarioPanel';
 import AiPanel from '@/components/panels/AiPanel';
 import KpiStrip from '@/components/panels/KpiStrip';
-import EventLogPanel from '@/components/panels/EventLogPanel';
 import NarrationBar from '@/components/panels/NarrationBar';
 import { BACKGROUND_COUNT, MISSION_EDGES, edgeKey } from '@/sim/graph';
 import type { LinkHealth } from '@/sim/types';
@@ -65,10 +64,11 @@ function LinkLegend() {
  * interactive regions use pointer-events-auto so the WebGL layer never eats clicks.
  */
 export default function MissionHudOverlay() {
+  const demoMode = useMissionStore((s) => s.demoMode);
+  const setDemoMode = useMissionStore((s) => s.setDemoMode);
   const baselineKpi = useMissionStore((s) => s.baselineKpi);
   const aiKpi = useMissionStore((s) => s.aiKpi);
   const aiPanel = useMissionStore((s) => s.aiPanelDisplay);
-  const logs = useMissionStore((s) => s.logs);
   const reset = useMissionStore((s) => s.reset);
   const startScriptedTour = useMissionStore((s) => s.startScriptedTour);
   const tourActive = useMissionStore((s) => s.tourActive);
@@ -86,16 +86,39 @@ export default function MissionHudOverlay() {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-10">
-      <header className="absolute top-3 md:top-4 left-3 right-3 md:left-4 md:right-4 flex flex-wrap items-start justify-between gap-2 pointer-events-none">
+      <header className="absolute top-4 left-6 right-6 flex flex-wrap items-start justify-between gap-4 pointer-events-none">
         <div className="pointer-events-auto">
-          <div className="font-[family-name:var(--font-display)] text-[12px] md:text-[14px] tracking-[0.18em] text-[var(--color-accent)] hud-glow-text">
+          <div className="font-[family-name:var(--font-display)] text-[14px] md:text-[18px] tracking-[0.2em] text-[var(--color-accent)] hud-glow-text mb-1">
             SWARM MISSION CONTROL
           </div>
-          <div className="text-[10px] md:text-[11px] text-[var(--color-text-dim)] mt-0.5">
+          <div className="text-[11px] md:text-[12px] text-white/50 mb-3">
             v2 · resilient coordination · {BACKGROUND_COUNT} background + 6 mission nodes
           </div>
+          <div className="inline-flex overflow-hidden rounded border border-white/10 bg-black/40 backdrop-blur pointer-events-auto">
+            <button
+              onClick={() => setDemoMode('baseline')}
+              className={`px-4 py-1.5 text-xs font-semibold tracking-wider transition-all ${
+                demoMode === 'baseline'
+                  ? 'bg-rose-500/20 text-rose-200 border-b-2 border-rose-500'
+                  : 'text-white/40 hover:bg-white/5 hover:text-white/80 border-b-2 border-transparent'
+              }`}
+            >
+              BASELINE OFF
+            </button>
+            <div className="w-px bg-white/10 my-1" />
+            <button
+              onClick={() => setDemoMode('ai')}
+              className={`px-4 py-1.5 text-xs font-semibold tracking-wider transition-all ${
+                demoMode === 'ai'
+                  ? 'bg-[var(--color-accent)]/20 text-[#60e0ff] border-b-2 border-[var(--color-accent)]'
+                  : 'text-white/40 hover:bg-white/5 hover:text-white/80 border-b-2 border-transparent'
+              }`}
+            >
+              AI ESTIMATOR ON
+            </button>
+          </div>
         </div>
-        <div className="pointer-events-auto">
+        <div className="pointer-events-auto flex flex-col items-end gap-2">
           <LinkLegend />
         </div>
       </header>
@@ -113,26 +136,24 @@ export default function MissionHudOverlay() {
       >
         <ScenarioPanel />
         <AiPanel panel={aiPanel} />
+        <div className="h-[300px] shrink-0">
+          <KpiStrip baseline={baselineKpi} ai={aiKpi} />
+        </div>
       </div>
 
-      {/* Desktop columns — bounded so they can never collide with the bottom strip */}
+      {/* Desktop columns */}
       <div
-        className={`hidden lg:block absolute ${tourActive ? 'top-[8.5rem]' : 'top-[4.25rem]'} bottom-[calc(220px+1rem)] left-4 w-[340px] pointer-events-auto`}
+        className={`hidden lg:block absolute ${tourActive ? 'top-[9.5rem]' : 'top-[5.5rem]'} bottom-6 left-6 w-[340px] pointer-events-auto`}
       >
         <ScenarioPanel />
       </div>
       <div
-        className={`hidden lg:block absolute ${tourActive ? 'top-[8.5rem]' : 'top-[4.25rem]'} bottom-[calc(220px+1rem)] right-4 w-[340px] pointer-events-auto`}
+        className={`hidden lg:flex absolute ${tourActive ? 'top-[9.5rem]' : 'top-[5.5rem]'} bottom-6 right-6 w-[380px] pointer-events-auto flex-col gap-4`}
       >
-        <AiPanel panel={aiPanel} />
-      </div>
-
-      {/* Bottom strip: event log + KPI split */}
-      <div className="absolute bottom-3 md:bottom-4 left-3 right-3 md:left-4 md:right-4 flex flex-col md:flex-row gap-2 md:gap-3 pointer-events-auto h-[200px]">
-        <div className="flex-1 min-h-0 min-w-0">
-          <EventLogPanel logs={logs} />
+        <div className="flex-[4] min-h-0">
+          <AiPanel panel={aiPanel} />
         </div>
-        <div className="shrink-0 w-full md:w-[380px] min-h-0">
+        <div className="flex-[3] min-h-0">
           <KpiStrip baseline={baselineKpi} ai={aiKpi} />
         </div>
       </div>

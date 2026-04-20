@@ -86,6 +86,7 @@ export function chooseAiCoordinator(
   simTime: number,
   obsTime: number[][],
   roleFailureActive: boolean,
+  currentCoord: number,
 ): number {
   if (!coordinator0Stressed(edgeHealth, roleFailureActive)) {
     return 0;
@@ -100,11 +101,21 @@ export function chooseAiCoordinator(
       const h = edgeHealthBetween(edgeHealth, c, n);
       if (h === 'lost') continue;
       const fresh = simTime - obsTime[c]![n]!;
-      const linkScore = h === 'ok' ? 1 : 0.45;
+      const linkScore = h === 'ok' ? 1.0 : 0.45;
       const stalenessPenalty = Math.min(1.2, fresh) / 1.2;
       score += linkScore * (1 - stalenessPenalty * 0.85);
     }
-    if (c === 0 && roleFailureActive) score *= 0.35;
+    
+    // Penalty for failing role
+    if (c === 0 && roleFailureActive) {
+      score *= 0.35;
+    }
+    
+    // Hysteresis: strongly prefer the current coordinator to prevent rapid oscillation
+    if (c === currentCoord) {
+      score += 0.8;
+    }
+
     if (score > bestScore + 0.001) {
       bestScore = score;
       best = c;
@@ -210,8 +221,9 @@ export function computeAi(
   prevDegradedAccum: number,
   dt: number,
   roleFailureActive: boolean,
+  currentCoord: number,
 ): { kpi: KpiSnapshot; degradedAccum: number; panel: AiPanelSnapshot } {
-  const coord = chooseAiCoordinator(edgeHealth, simTime, obsTime, roleFailureActive);
+  const coord = chooseAiCoordinator(edgeHealth, simTime, obsTime, roleFailureActive, currentCoord);
   const pErr = predictionError(simTime, obsTime, obsAngle, truthAngles);
   const nbrs = neighborsOf(coord);
 
