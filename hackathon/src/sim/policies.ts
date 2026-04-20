@@ -125,31 +125,40 @@ export function computeBaseline(
   const coord = 0;
   const nbrs = neighborsOf(coord);
   const st = staleness(simTime, obsTime);
-  const staleList = nbrs.map((n) => st[coord]![n]!);
+  /** Baseline caps at 20 s per neighbour — otherwise stale grows unboundedly. */
+  const staleList = nbrs.map((n) => Math.min(20, st[coord]![n]!));
   const avgStale = avg(staleList);
 
   let lostCritical = 0;
+  let degradedCritical = 0;
   for (const n of nbrs) {
-    if (edgeHealthBetween(edgeHealth, coord, n) === 'lost') lostCritical++;
+    const h = edgeHealthBetween(edgeHealth, coord, n);
+    if (h === 'lost') lostCritical++;
+    else if (h === 'degraded') degradedCritical++;
   }
 
+  /** Baseline has no resilience: stale telemetry and outages hurt continuity hard. */
   const continuity = Math.max(
     0,
     Math.min(
       100,
-      100 - formationError * 8 - avgStale * 22 - lostCritical * 14 - (simTime - obsTime[coord]![1]! > 1.2 ? 6 : 0),
+      100 - formationError * 12 - avgStale * 28 - lostCritical * 22 - degradedCritical * 6,
     ),
   );
 
+  /** Each "task" (track Sat-2, 3, 4) requires fresh direct telemetry. */
   let tasks = 0;
   for (const k of [1, 2, 3]) {
-    if (simTime - obsTime[coord]![k]! < 0.55) tasks++;
+    if (simTime - obsTime[coord]![k]! < 0.6) tasks++;
   }
 
-  const uncertainty = Math.max(0, Math.min(100, avgStale * 32 + formationError * 9 + lostCritical * 10));
+  const uncertainty = Math.max(
+    0,
+    Math.min(100, avgStale * 36 + formationError * 11 + lostCritical * 14 + degradedCritical * 4),
+  );
 
   let degradedDelta = 0;
-  const anyDegradedEdge = MISSION_EDGES.some(([a, b]) => getEdgeHealth(edgeHealth, a, b) === 'degraded');
+  const anyDegradedEdge = MISSION_EDGES.some(([a, b]) => getEdgeHealth(edgeHealth, a, b) !== 'ok');
   const staleBad = avgStale > 0.35;
   if (anyDegradedEdge || staleBad) degradedDelta = dt;
 
@@ -162,6 +171,33 @@ export function computeBaseline(
     },
     degradedAccum: prevDegradedAccum + degradedDelta,
   };
+}
+
+/**
+ * Can the AI at `coord` estimate neighbour `target` by bridging through another
+ * healthy neighbour `m`? Requires (coord,m) healthy AND m has a fresh obs of target.
+ */
+function canBridgeEstimate(
+  coord: number,
+  target: number,
+  obsTime: number[][],
+  edgeHealth: ReadonlyMap<string, LinkHealth>,
+  simTime: number,
+): { viable: boolean; via: number | null; age: number } {
+  let best: { via: number; age: number } | null = null;
+  for (const m of neighborsOf(coord)) {
+    if (m === target) continue;
+    const hCoordM = edgeHealthBetween(edgeHealth, coord, m);
+    if (hCoordM === 'lost') continue;
+    const hMTarget = edgeHealthBetween(edgeHealth, m, target);
+    if (hMTarget === 'lost') continue;
+    const tMTarget = obsTime[m]?.[target];
+    if (tMTarget == null || tMTarget <= OBS_SENTINEL + 1) continue;
+    const age = simTime - tMTarget;
+    if (age < 0 || age > 3.5) continue;
+    if (!best || age < best.age) best = { via: m, age };
+  }
+  return best ? { viable: true, via: best.via, age: best.age } : { viable: false, via: null, age: Infinity };
 }
 
 export function computeAi(
@@ -179,76 +215,128 @@ export function computeAi(
   const pErr = predictionError(simTime, obsTime, obsAngle, truthAngles);
   const nbrs = neighborsOf(coord);
 
-  const effectiveStale: number[] = nbrs.map((n) => {
-    const raw = Math.max(0, simTime - obsTime[coord]![n]!);
-    if (!hasValidObservation(obsTime, simTime, coord, n)) return raw;
-    const e = pErr[coord]![n]!;
-    const tracked = e < 0.09;
-    return tracked ? Math.min(raw, 0.18) : raw * 0.82;
+  /**
+   * Effective staleness per neighbour: AI tries three strategies in order —
+   * (1) fresh direct obs, (2) dead-reckoning from last valid direct obs,
+   * (3) bridge through another healthy neighbour.
+   */
+  const perNbr = nbrs.map((n) => {
+    const direct = hasValidObservation(obsTime, simTime, coord, n);
+    const rawDirect = Math.max(0, simTime - obsTime[coord]![n]!);
+    if (direct) {
+      const e = pErr[coord]![n]!;
+      const tracked = e < 0.09;
+      return { n, eff: tracked ? Math.min(rawDirect, 0.15) : rawDirect * 0.55, mode: 'direct' as const };
+    }
+    const bridge = canBridgeEstimate(coord, n, obsTime, edgeHealth, simTime);
+    if (bridge.viable) {
+      /** Bridge carries its own latency + a small penalty; AI admits lower confidence. */
+      return { n, eff: Math.min(1.0, bridge.age + 0.25), mode: 'bridge' as const };
+    }
+    /** No signal path at all — cap at a finite value so continuity still moves. */
+    return { n, eff: Math.min(5, rawDirect), mode: 'none' as const };
   });
 
+  const effectiveStale = perNbr.map((x) => x.eff);
   const avgEff = avg(effectiveStale);
-  let lostCritical = 0;
-  for (const n of nbrs) {
-    if (edgeHealthBetween(edgeHealth, coord, n) === 'lost') lostCritical++;
-  }
 
+  let lostCritical = 0;
+  let degradedCritical = 0;
+  for (const n of nbrs) {
+    const h = edgeHealthBetween(edgeHealth, coord, n);
+    if (h === 'lost') lostCritical++;
+    else if (h === 'degraded') degradedCritical++;
+  }
+  const bridgedCount = perNbr.filter((x) => x.mode === 'bridge').length;
+
+  /** AI partially rescues continuity through bridging; formationError decays faster under AI. */
   const continuity = Math.max(
     0,
-    Math.min(100, 100 - formationError * 6 - avgEff * 15 - lostCritical * 8),
+    Math.min(
+      100,
+      100 - formationError * 5 - avgEff * 12 - Math.max(0, lostCritical - bridgedCount) * 10 - degradedCritical * 2,
+    ),
   );
 
   let tasks = 0;
   for (const k of [1, 2, 3]) {
-    const raw = simTime - obsTime[coord]![k]!;
-    const e = hasValidObservation(obsTime, simTime, coord, k) ? pErr[coord]![k]! : 1;
-    if (raw < 0.55 || e < 0.1) tasks++;
+    const p = perNbr.find((x) => x.n === k);
+    if (!p) continue;
+    if (p.mode === 'direct' && p.eff < 0.6) tasks++;
+    else if (p.mode === 'bridge' && p.eff < 1.6) tasks++;
   }
 
-  const uncertainty = Math.max(0, Math.min(100, avgEff * 26 + formationError * 7 + lostCritical * 5));
+  const uncertainty = Math.max(
+    0,
+    Math.min(100, avgEff * 22 + formationError * 6 + Math.max(0, lostCritical - bridgedCount) * 6),
+  );
 
+  /** AI only counts "degraded" when it can't bridge effectively. */
   let degradedDelta = 0;
+  const anyUnbridgedOutage = perNbr.some((x) => x.mode === 'none');
   const anyDegradedEdge = MISSION_EDGES.some(([a, b]) => getEdgeHealth(edgeHealth, a, b) === 'degraded');
-  if (anyDegradedEdge || avgEff > 0.32) degradedDelta = dt;
+  if (anyUnbridgedOutage || (anyDegradedEdge && avgEff > 0.4)) degradedDelta = dt;
 
-  const confidences = nbrs.map((n) => {
+  const confidences = perNbr.map(({ n, mode }) => {
     const h = edgeHealthBetween(edgeHealth, coord, n);
-    const base = h === 'ok' ? 0.92 : h === 'degraded' ? 0.55 : 0.08;
-    if (!hasValidObservation(obsTime, simTime, coord, n)) {
-      return Math.max(0, Math.min(1, base * 0.35));
+    const base = h === 'ok' ? 0.94 : h === 'degraded' ? 0.6 : 0.18;
+    if (mode === 'direct') {
+      const fresh = Math.exp(-Math.max(0, simTime - obsTime[coord]![n]!) * 1.1);
+      const e = pErr[coord]![n]!;
+      const track = Math.exp(-((e / 0.12) ** 2));
+      return Math.max(0, Math.min(1, base * (0.35 + 0.65 * fresh) * (0.55 + 0.45 * track)));
     }
-    const fresh = Math.exp(-Math.max(0, simTime - obsTime[coord]![n]!) * 1.1);
-    const track = Math.exp(-((pErr[coord]![n]! / 0.12) ** 2));
-    return Math.max(0, Math.min(1, base * (0.35 + 0.65 * fresh) * (0.55 + 0.45 * track)));
+    if (mode === 'bridge') return 0.55;
+    return Math.max(0, Math.min(1, base * 0.3));
   });
   const minConfidence = confidences.length ? Math.min(...confidences) : 0;
 
-  const validNbrs = nbrs.filter((n) => hasValidObservation(obsTime, simTime, coord, n));
   let predSummary: string;
-  if (validNbrs.length === 0) {
-    predSummary = 'Awaiting valid neighbor packets on one or more links.';
+  const bridged = perNbr.find((x) => x.mode === 'bridge');
+  const unbridged = perNbr.find((x) => x.mode === 'none');
+  const bridgeInfo = bridged
+    ? canBridgeEstimate(coord, bridged.n, obsTime, edgeHealth, simTime)
+    : null;
+  if (unbridged) {
+    predSummary = `No path to Sat-${unbridged.n + 1}: holding last-known state (dead-reckoning).`;
+  } else if (bridged && bridgeInfo?.via != null) {
+    predSummary = `Sat-${bridged.n + 1} estimated via Sat-${bridgeInfo.via + 1} bridge · age ${bridged.eff.toFixed(1)}s.`;
   } else {
-    const worstN = validNbrs.reduce((a, b) => (pErr[coord]![b]! > pErr[coord]![a]! ? b : a), validNbrs[0]!);
-    predSummary = `Δθ̂ max≈${(pErr[coord]![worstN]! * (180 / Math.PI)).toFixed(1)}° on Sat-${worstN + 1}`;
+    const valid = perNbr.filter((x) => x.mode === 'direct');
+    if (valid.length === 0) {
+      predSummary = 'Awaiting neighbour packets.';
+    } else {
+      const worst = valid.reduce((a, b) => (pErr[coord]![b.n]! > pErr[coord]![a.n]! ? b : a));
+      predSummary = `Δθ̂ max ≈ ${(pErr[coord]![worst.n]! * (180 / Math.PI)).toFixed(1)}° on Sat-${worst.n + 1}.`;
+    }
   }
 
   let risk: RiskLevel = 'low';
-  let riskReason = 'Topology stable; packets arriving.';
-  if (minConfidence < 0.35 || lostCritical > 0) {
+  let riskReason = 'Topology stable; all neighbours observable.';
+  if (unbridged) {
     risk = 'high';
-    riskReason = lostCritical > 0 ? 'Critical link outage; coordination gap.' : 'Stale telemetry; estimator carrying state.';
-  } else if (minConfidence < 0.62 || avgEff > 0.35) {
+    riskReason = `Sat-${unbridged.n + 1} unreachable on all paths — dead-reckoning only.`;
+  } else if (lostCritical > 0 && bridged && bridgeInfo?.via != null) {
+    risk = 'medium';
+    riskReason = `Direct link down; bridging via Sat-${bridgeInfo.via + 1}.`;
+  } else if (minConfidence < 0.6 || avgEff > 0.35) {
     risk = 'medium';
     riskReason = 'Elevated latency / intermittent updates.';
   }
 
-  const estimatorActive = avg(nbrs.map((n) => simTime - obsTime[coord]![n]!)) > 0.28 || roleFailureActive;
+  /** Estimator is active when any neighbour needs bridging, dead-reckoning, or on role failure. */
+  const estimatorActive =
+    perNbr.some((x) => x.mode !== 'direct') || roleFailureActive;
 
   let recommendation = 'Hold roles; maintain current task allocation.';
   if (coord !== 0 && (lostCritical > 0 || minConfidence < 0.45 || roleFailureActive)) {
-    recommendation = `Reassign coordinator to Sat-${coord + 1}; redistribute tracking tasks to healthy neighbors.`;
+    recommendation = `Reassign coordinator to Sat-${coord + 1}; redistribute tracking tasks to healthy neighbours.`;
+  } else if (unbridged) {
+    recommendation = `Schedule rendezvous pass with Sat-${unbridged.n + 1}; accept degraded tracking.`;
+  } else if (bridged) {
+    recommendation = `Route Sat-${bridged.n + 1} telemetry via bridge neighbour until direct link restored.`;
   } else if (minConfidence < 0.55) {
-    recommendation = 'Pre-stage backup tracker; increase cross-link probing cadence.';
+    recommendation = 'Increase cross-link probing cadence; pre-stage backup tracker.';
   }
 
   const panel: AiPanelSnapshot = {

@@ -3,7 +3,7 @@ import { MISSION_EDGES, edgeKey, initialEdgeHealth } from '@/sim/graph';
 import { createObservationState, initPacketSchedule, rescheduleEdge } from '@/sim/observations';
 import { deliverPacket, processPackets } from '@/sim/packets';
 import { computeAi, computeBaseline } from '@/sim/policies';
-import { buildScriptedTour, sortEvents } from '@/sim/scenario';
+import { TOUR_DURATION_SEC, buildScriptedTour, sortEvents } from '@/sim/scenario';
 import type { AiPanelSnapshot, KpiSnapshot, LinkHealth, LogEntry, ScenarioEvent } from '@/sim/types';
 import {
   advanceAngles,
@@ -25,21 +25,32 @@ interface DelayStorm {
   factor: number;
 }
 
+interface ContinuitySample {
+  t: number;
+  baseline: number;
+  ai: number;
+}
+
 interface MissionState {
   world: WorldSnapshot;
   edgeHealth: Map<string, LinkHealth>;
   obs: ReturnType<typeof createObservationState>;
   pendingEvents: ScenarioEvent[];
   tourActive: boolean;
+  tourStartSimTime: number;
   baselineDegradedAccum: number;
   aiDegradedAccum: number;
   baselineKpi: KpiSnapshot;
   aiKpi: KpiSnapshot;
   aiPanel: AiPanelSnapshot;
+  /** Smoothed copy of aiPanel for the UI — no jitter on every tick. */
+  aiPanelDisplay: AiPanelSnapshot;
   logs: LogEntry[];
   lastAiCoordinator: number;
   delayStorm: DelayStorm | null;
   displayLink: Map<string, number>;
+  /** Rolling continuity series for the baseline-vs-AI sparkline. */
+  continuityHistory: ContinuitySample[];
 
   reset: () => void;
   tick: (dt: number) => void;
@@ -108,11 +119,13 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   obs: __seeded.obs,
   pendingEvents: [],
   tourActive: false,
+  tourStartSimTime: -1,
   baselineDegradedAccum: 0,
   aiDegradedAccum: 0,
   baselineKpi: defaultKpi(),
   aiKpi: defaultKpi(),
   aiPanel: defaultPanel(),
+  aiPanelDisplay: defaultPanel(),
   logs: [
     {
       id: uid(),
@@ -124,6 +137,7 @@ export const useMissionStore = create<MissionState>((set, get) => ({
   lastAiCoordinator: 0,
   delayStorm: null,
   displayLink: new Map(),
+  continuityHistory: [],
 
   pushLog: (message, type) => {
     set((s) => ({
@@ -142,14 +156,17 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       obs,
       pendingEvents: [],
       tourActive: false,
+      tourStartSimTime: -1,
       baselineDegradedAccum: 0,
       aiDegradedAccum: 0,
       baselineKpi: defaultKpi(),
       aiKpi: defaultKpi(),
       aiPanel: defaultPanel(),
+      aiPanelDisplay: defaultPanel(),
       lastAiCoordinator: 0,
       delayStorm: null,
       displayLink: new Map(),
+      continuityHistory: [],
       logs: [
         {
           id: uid(),
@@ -227,8 +244,9 @@ export const useMissionStore = create<MissionState>((set, get) => ({
 
   startScriptedTour: () => {
     const { world, pushLog } = get();
-    const events = buildScriptedTour(world.simTime + 0.25);
-    set({ pendingEvents: sortEvents(events), tourActive: true });
+    const tourStart = world.simTime + 0.25;
+    const events = buildScriptedTour(tourStart);
+    set({ pendingEvents: sortEvents(events), tourActive: true, tourStartSimTime: tourStart });
     pushLog('Presenter: scripted tour armed (≈75s)', 'info');
   },
 
@@ -336,6 +354,33 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       displayLink.set(k, smooth(cur, tgt));
     }
 
+    /** Low-pass the AI panel readouts so text doesn't jitter every tick. */
+    const lerp = (a: number, b: number, alpha: number) => a + (b - a) * alpha;
+    const alpha = Math.min(1, dt * 3.5);
+    const displayPanel: AiPanelSnapshot = {
+      minConfidence: lerp(s.aiPanelDisplay.minConfidence, ai.panel.minConfidence, alpha),
+      predictedNeighborSummary: ai.panel.predictedNeighborSummary,
+      risk: ai.panel.risk,
+      riskReason: ai.panel.riskReason,
+      recommendation: ai.panel.recommendation,
+      estimatorActive: ai.panel.estimatorActive,
+      coordinatorId: ai.panel.coordinatorId,
+    };
+
+    /** Keep ~600 samples (≈60 s at 10 Hz throttle). */
+    const nextHistory = s.continuityHistory.slice();
+    const lastSample = nextHistory[nextHistory.length - 1];
+    if (!lastSample || world.simTime - lastSample.t > 0.25) {
+      nextHistory.push({ t: world.simTime, baseline: base.kpi.missionContinuity, ai: ai.kpi.missionContinuity });
+      if (nextHistory.length > 320) nextHistory.shift();
+    }
+
+    /** Auto-disarm tour once the narration window is over. */
+    let tourActive = s.tourActive;
+    if (tourActive && s.tourStartSimTime >= 0 && world.simTime - s.tourStartSimTime > TOUR_DURATION_SEC + 2) {
+      tourActive = false;
+    }
+
     set({
       world,
       edgeHealth,
@@ -347,8 +392,11 @@ export const useMissionStore = create<MissionState>((set, get) => ({
       baselineKpi: base.kpi,
       aiKpi: ai.kpi,
       aiPanel: ai.panel,
+      aiPanelDisplay: displayPanel,
       lastAiCoordinator: ai.panel.coordinatorId,
       displayLink,
+      continuityHistory: nextHistory,
+      tourActive,
     });
   },
 }));

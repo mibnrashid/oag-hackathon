@@ -4,6 +4,7 @@ import ScenarioPanel from '@/components/panels/ScenarioPanel';
 import AiPanel from '@/components/panels/AiPanel';
 import KpiStrip from '@/components/panels/KpiStrip';
 import EventLogPanel from '@/components/panels/EventLogPanel';
+import NarrationBar from '@/components/panels/NarrationBar';
 import { BACKGROUND_COUNT, MISSION_EDGES, edgeKey } from '@/sim/graph';
 import type { LinkHealth } from '@/sim/types';
 
@@ -66,10 +67,11 @@ function LinkLegend() {
 export default function MissionHudOverlay() {
   const baselineKpi = useMissionStore((s) => s.baselineKpi);
   const aiKpi = useMissionStore((s) => s.aiKpi);
-  const aiPanel = useMissionStore((s) => s.aiPanel);
+  const aiPanel = useMissionStore((s) => s.aiPanelDisplay);
   const logs = useMissionStore((s) => s.logs);
   const reset = useMissionStore((s) => s.reset);
   const startScriptedTour = useMissionStore((s) => s.startScriptedTour);
+  const tourActive = useMissionStore((s) => s.tourActive);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -98,17 +100,30 @@ export default function MissionHudOverlay() {
         </div>
       </header>
 
+      {/* Narration bar only shows during a scripted tour */}
+      {tourActive ? (
+        <div className="absolute top-[3.25rem] md:top-14 left-1/2 -translate-x-1/2 w-[min(720px,calc(100vw-2rem))] pointer-events-auto">
+          <NarrationBar />
+        </div>
+      ) : null}
+
       {/* Mobile stack */}
-      <div className="lg:hidden absolute top-14 left-3 right-3 flex flex-col gap-2 max-h-[calc(55vh-80px)] overflow-y-auto pointer-events-auto">
+      <div
+        className={`lg:hidden absolute ${tourActive ? 'top-[10rem]' : 'top-14'} left-3 right-3 flex flex-col gap-2 max-h-[calc(55vh-80px)] overflow-y-auto pointer-events-auto`}
+      >
         <ScenarioPanel />
         <AiPanel panel={aiPanel} />
       </div>
 
       {/* Desktop columns — bounded so they can never collide with the bottom strip */}
-      <div className="hidden lg:block absolute top-[4.25rem] bottom-[calc(220px+1rem)] left-4 w-[340px] pointer-events-auto">
+      <div
+        className={`hidden lg:block absolute ${tourActive ? 'top-[8.5rem]' : 'top-[4.25rem]'} bottom-[calc(220px+1rem)] left-4 w-[340px] pointer-events-auto`}
+      >
         <ScenarioPanel />
       </div>
-      <div className="hidden lg:block absolute top-[4.25rem] bottom-[calc(220px+1rem)] right-4 w-[340px] pointer-events-auto">
+      <div
+        className={`hidden lg:block absolute ${tourActive ? 'top-[8.5rem]' : 'top-[4.25rem]'} bottom-[calc(220px+1rem)] right-4 w-[340px] pointer-events-auto`}
+      >
         <AiPanel panel={aiPanel} />
       </div>
 

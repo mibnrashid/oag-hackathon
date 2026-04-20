@@ -1,19 +1,19 @@
 import { useMemo } from 'react';
-import { Line, Text } from '@react-three/drei';
+import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { MISSION_COUNT, MISSION_EDGES, edgeKey } from '@/sim/graph';
 import { missionPosition } from '@/sim/orbitLayout';
 import { useMissionStore } from '@/store/mission-store';
-
-function linkColor(smoothed: number): string {
-  if (smoothed < 0.45) return '#2ee6ff';
-  if (smoothed < 1.45) return '#e6c82e';
-  return '#ff3355';
-}
+import CommLink from './CommLink';
+import CoordinatorHalo from './CoordinatorHalo';
 
 export default function MissionGraph() {
   const angles = useMissionStore((s) => s.world.angles);
   const displayLink = useMissionStore((s) => s.displayLink);
+  const coordinatorId = useMissionStore((s) => s.aiPanel.coordinatorId);
+  const estimatorActive = useMissionStore((s) => s.aiPanel.estimatorActive);
+  const roleFailureUntil = useMissionStore((s) => s.world.roleFailureUntil);
+  const simTime = useMissionStore((s) => s.world.simTime);
 
   const nodes = useMemo(() => {
     return Array.from({ length: MISSION_COUNT }, (_, i) => {
@@ -22,42 +22,45 @@ export default function MissionGraph() {
     });
   }, [angles]);
 
+  const roleFailing = simTime < roleFailureUntil;
+
   return (
     <group>
       {MISSION_EDGES.map(([a, b]) => {
         const k = edgeKey(a, b);
         const sm = displayLink.get(k) ?? 0;
-        const pts = [nodes[a]!.clone(), nodes[b]!.clone()];
-        return (
-          <Line key={k} points={pts} color={linkColor(sm)} lineWidth={1.75} transparent opacity={0.92} />
-        );
+        return <CommLink key={k} edgeKey={k} a={nodes[a]!} b={nodes[b]!} smoothed={sm} />;
       })}
+
       {Array.from({ length: MISSION_COUNT }, (_, i) => {
         const p = nodes[i]!;
+        const isCoord = i === coordinatorId;
+        const isFailing = i === 0 && roleFailing;
         return (
           <group key={i} position={p}>
             <mesh>
               <sphereGeometry args={[0.028, 16, 16]} />
               <meshStandardMaterial
-                color={i === 0 ? '#7cffc4' : '#b7d7ff'}
-                emissive={i === 0 ? '#0f3a2a' : '#0a1a2a'}
-                emissiveIntensity={0.6}
+                color={isFailing ? '#ff6b6b' : isCoord ? '#7cffc4' : '#b7d7ff'}
+                emissive={isFailing ? '#3a0a0a' : isCoord ? '#0f3a2a' : '#0a1a2a'}
+                emissiveIntensity={isCoord ? 0.9 : 0.55}
                 metalness={0.35}
                 roughness={0.35}
               />
             </mesh>
+            {isCoord && <CoordinatorHalo estimatorActive={estimatorActive} />}
             <Text
-              position={[0, 0.05, 0]}
-              fontSize={0.034}
-              color="#e8f4ff"
-              outlineWidth={0.007}
+              position={[0, 0.06, 0]}
+              fontSize={0.03}
+              color={isCoord ? '#c0ffe4' : '#e8f4ff'}
+              outlineWidth={0.006}
               outlineColor="#020508"
               anchorX="center"
               anchorY="bottom"
-              letterSpacing={0.06}
+              letterSpacing={0.05}
               raycast={() => null}
             >
-              {`SAT-${i + 1}`}
+              {isCoord ? `SAT-${i + 1} · COORD` : `SAT-${i + 1}`}
             </Text>
           </group>
         );

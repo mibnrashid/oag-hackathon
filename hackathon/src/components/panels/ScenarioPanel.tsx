@@ -11,6 +11,7 @@ export default function ScenarioPanel() {
   const reset = useMissionStore((s) => s.reset);
   const startScriptedTour = useMissionStore((s) => s.startScriptedTour);
   const world = useMissionStore((s) => s.world);
+  const tourActive = useMissionStore((s) => s.tourActive);
 
   const Btn = ({
     children,
@@ -65,7 +66,9 @@ export default function ScenarioPanel() {
           Restore all links (nominal)
         </Btn>
         <div className="h-px bg-white/10 my-1" />
-        <Btn onClick={startScriptedTour}>Play scripted tour (~75s)</Btn>
+        <Btn onClick={startScriptedTour}>
+          {tourActive ? 'Restart scripted tour' : 'Play scripted tour (~75s)'}
+        </Btn>
         <Btn onClick={reset} tone="good">
           Reset demo
         </Btn>
